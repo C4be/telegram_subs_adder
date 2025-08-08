@@ -28,14 +28,20 @@ class Client:
         if not self.client.is_user_authorized():
             self.client_logger.warning("Не авторизован, отправляем код")
             self.client.send_code_request(self.phone)
+
             if code is None:
                 code = input(f"Введите код подтверждения для {self.phone}: ")
+
             try:
                 self.client.sign_in(self.phone, code)
                 self.client_logger.info("Авторизация успешна")
+
             except SessionPasswordNeededError:
-                self.client_logger.error("Нужен пароль 2FA — не реализовано.")
-                raise
+                self.client_logger.warning("Нужен пароль двухфакторной аутентификации")
+                password = input("Введите пароль 2FA: ")
+                self.client.sign_in(password=password)
+                self.client_logger.info("Авторизация успешна с 2FA")
+
             except Exception as e:
                 self.client_logger.exception(f"Ошибка авторизации: {e}")
                 raise
