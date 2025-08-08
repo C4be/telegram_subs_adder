@@ -28,22 +28,19 @@ manager = ClientManager()
 manager.add_client(foxy_bot)
 manager.add_client(beer_bot)
 
+# Запустить клиентов
 manager.start_all()
 
-# Получить список всех диалогов
-dialogs = manager.list_dialogs_json()
-print(dialogs)
+# Получаем все диалоги
+dialogs = manager.list_dialogs(include_channels=True)
 
-print()
-
-# Получение отфильтрованных диалогов
+# Фильтруем по ключевым словам
 filtered_dialogs = manager.filtered_list_dialogs_by_keywords(dialogs)
-print(filtered_dialogs)
 
-print()
+# Сохраняем в JSON
+with open("data.json", "w", encoding="utf-8") as f:
+    json.dump(manager.dialogs_to_json(filtered_dialogs), f, ensure_ascii=False, indent=2)
 
-# сохранение списка диалогов
-with open('data.json', 'w', encoding='utf-8') as file:
-    json.dump(dialogs, file, ensure_ascii=False, indent=4)
-
-manager.stop_all()
+# Скрап участников из первого найденного чата
+if filtered_dialogs:
+    manager.scrape_chat(manager.clients[0], filtered_dialogs[2])
