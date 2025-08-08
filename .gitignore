@@ -1,3 +1,5 @@
 logs
 accounts.json
+channels.json
+data.json
 *.session
