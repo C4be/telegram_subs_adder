@@ -20,6 +20,10 @@ class Client:
             session=self.phone, api_id=self.api_id, api_hash=self.api_hash
         )
 
+    @property
+    def name(self):
+        return self.client_name
+    
     def connect(self):
         self.client.connect()
         self.client_logger.debug("Подключение установлено")

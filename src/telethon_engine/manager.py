@@ -1,7 +1,9 @@
 import csv
 import re
 from telethon.tl.functions.messages import GetDialogsRequest
-from telethon.tl.types import InputPeerEmpty
+from telethon.tl.functions.messages import GetFullChatRequest
+from telethon.tl.functions.channels import GetParticipantsRequest
+from telethon.tl.types import InputPeerEmpty, ChannelParticipantsSearch, ChannelParticipantsRecent
 from telethon.errors.rpcerrorlist import ChatAdminRequiredError
 
 from telethon_engine.client import Client
@@ -127,44 +129,166 @@ class ClientManager:
             ]
         return json_ready
 
-    def scrape_chat(self, client: Client, chat, filename_prefix="members"):
-        """
-        Скрап участников из чата и сохранение в CSV
-        """
-        try:
-            users = client.client.get_participants(chat, aggressive=True)
-        except ChatAdminRequiredError:
-            self.logger.error(f"🚫 Нужны права админа для {getattr(chat, 'title', '')}")
-            return None
+    # def scrape_all_chats(self, chats_by_client, filename="members-all.csv"):
+    #     all_users = {}
+    #     for client, chats in chats_by_client.items():
+    #         for chat in chats:
+    #             try:
+    #                 self.logger.info(f"Обрабатываем чат {chat.title} ({chat.id}), тип {chat.__class__.__name__}")
 
-        fn = f"{filename_prefix}-{re.sub('-+','-', re.sub('[^a-zA-Zа-яА-Я0-9]', '-', getattr(chat, 'title', '').lower()))}.csv"
+    #                 if chat.__class__.__name__ == 'Chat':
+    #                     # Обычный чат
+    #                     full_chat = client.client(GetFullChatRequest(chat_id=chat.id))
+    #                     users = full_chat.users
+    #                 else:
+    #                     # Канал или супергруппа
+    #                     users = client.client.get_participants(chat, aggressive=True)
 
-        with open(fn, "w", encoding="utf-8", newline="") as f:
+    #                 self.logger.info(f"Получено {len(users)} участников")
+
+    #             except ChatAdminRequiredError:
+    #                 self.logger.warning(f"Нет прав админа для {chat.title}, пробуем частично")
+    #                 users = []
+    #                 # твоя логика с GetParticipantsRequest с фильтрами
+    #             except Exception as e:
+    #                 self.logger.error(f"Ошибка при получении участников из {chat.title}: {e}")
+    #     # for client, chats in chats_by_client.items():
+    #     #     self.logger.info(f"Обрабатываем клиента {client.name} с {len(chats)} чатами")
+    #     #     for chat in chats:
+    #     #         try:
+    #     #             # Пробуем получить всех участников (требует права админа)
+    #     #             users = client.client.get_participants(chat, aggressive=True)
+    #     #         except ChatAdminRequiredError:
+    #     #             self.logger.warning(f"🚫 Нет прав админа для {getattr(chat, 'title', '')}, берем частичных участников")
+    #     #             users = []
+    #     #             # Получаем участников через ChannelParticipantsRecent и поиск
+    #     #             try:
+    #     #                 limit = 200  # ограничение, можно увеличить при желании
+    #     #                 recent = client.client(GetParticipantsRequest(
+    #     #                     channel=chat,
+    #     #                     filter=ChannelParticipantsRecent(),
+    #     #                     offset=0,
+    #     #                     limit=limit,
+    #     #                     hash=0
+    #     #                 ))
+    #     #                 users.extend(recent.users)
+
+    #     #                 # Для расширения списка — поиск по пустой строке
+    #     #                 search = client.client(GetParticipantsRequest(
+    #     #                     channel=chat,
+    #     #                     filter=ChannelParticipantsSearch(""),
+    #     #                     offset=0,
+    #     #                     limit=limit,
+    #     #                     hash=0
+    #     #                 ))
+    #     #                 users.extend(search.users)
+    #     #             except Exception as e:
+    #     #                 self.logger.error(f"Ошибка при частичном получении участников из {getattr(chat, 'title', '')}: {e}")
+
+    #             for u in users:
+    #                 # Уникальность по user id
+    #                 if u.id not in all_users:
+    #                     active = not u.deleted and u.status is not None
+    #                     all_users[u.id] = {
+    #                         "username": u.username or "",
+    #                         "user_id": u.id,
+    #                         "access_hash": u.access_hash,
+    #                         "name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
+    #                         "group": getattr(chat, "title", ""),
+    #                         "group_id": getattr(chat, "id", ""),
+    #                         "active": "yes" if active else "no",
+    #                     }
+
+    #     # Записываем всех уникальных пользователей в один CSV
+    #     with open(filename, "w", encoding="utf-8", newline="") as f:
+    #         w = csv.writer(f)
+    #         w.writerow(["username", "user id", "access hash", "name", "group", "group id", "active"])
+    #         for u in all_users.values():
+    #             w.writerow([
+    #                 u["username"],
+    #                 u["user_id"],
+    #                 u["access_hash"],
+    #                 u["name"],
+    #                 u["group"],
+    #                 u["group_id"],
+    #                 u["active"],
+    #             ])
+
+    #     self.logger.info(f"✅ Сохранено {len(all_users)} уникальных участников в {filename}")
+    #     return filename
+
+    def scrape_all_chats(self, chats_by_client, filename="members-all.csv"):
+        all_users = {}
+        for client, chats in chats_by_client.items():
+            self.logger.info(f"Обрабатываем клиента {client.name} с {len(chats)} чатами")
+            for chat in chats:
+                try:
+                    # Получаем полноценный объект (с access_hash), чтобы корректно получить участников
+                    entity = client.client.get_entity(chat.id)
+
+                    # Получаем участников
+                    users = client.client.get_participants(entity, aggressive=True)
+                    self.logger.info(f"Получено {len(users)} участников из {chat.title}")
+
+                except ChatAdminRequiredError:
+                    self.logger.warning(f"🚫 Нет прав админа для {chat.title}, пытаемся получить частично")
+                    users = []
+                    try:
+                        limit = 200
+                        recent = client.client(GetParticipantsRequest(
+                            channel=entity,
+                            filter=ChannelParticipantsRecent(),
+                            offset=0,
+                            limit=limit,
+                            hash=0
+                        ))
+                        users.extend(recent.users)
+
+                        search = client.client(GetParticipantsRequest(
+                            channel=entity,
+                            filter=ChannelParticipantsSearch(""),
+                            offset=0,
+                            limit=limit,
+                            hash=0
+                        ))
+                        users.extend(search.users)
+                        self.logger.info(f"Получено {len(users)} частичных участников из {chat.title} после ограничения прав")
+
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при частичном получении участников из {chat.title}: {e}")
+
+                except Exception as e:
+                    self.logger.error(f"Ошибка при получении участников из {chat.title}: {e}")
+                    continue
+
+                # Сохраняем уникальных пользователей
+                for u in users:
+                    if u.id not in all_users:
+                        active = not u.deleted and u.status is not None
+                        all_users[u.id] = {
+                            "username": u.username or "",
+                            "user_id": u.id,
+                            "access_hash": u.access_hash,
+                            "name": f"{u.first_name or ''} {u.last_name or ''}".strip(),
+                            "group": chat.title,
+                            "group_id": chat.id,
+                            "active": "yes" if active else "no",
+                        }
+
+        # Записываем в CSV
+        with open(filename, "w", encoding="utf-8", newline="") as f:
             w = csv.writer(f)
-            w.writerow(
-                [
-                    "username",
-                    "user id",
-                    "access hash",
-                    "name",
-                    "group",
-                    "group id",
-                    "active",
-                ]
-            )
-            for u in users:
-                active = not u.deleted and u.status is not None
-                w.writerow(
-                    [
-                        u.username or "",
-                        u.id,
-                        u.access_hash,
-                        f"{u.first_name or ''} {u.last_name or ''}".strip(),
-                        getattr(chat, "title", ""),
-                        getattr(chat, "id", ""),
-                        "yes" if active else "no",
-                    ]
-                )
+            w.writerow(["username", "user id", "access hash", "name", "group", "group id", "active"])
+            for u in all_users.values():
+                w.writerow([
+                    u["username"],
+                    u["user_id"],
+                    u["access_hash"],
+                    u["name"],
+                    u["group"],
+                    u["group_id"],
+                    u["active"],
+                ])
 
-        self.logger.info(f"✅ Сохранено {len(users)} участников в {fn}")
-        return fn
+        self.logger.info(f"✅ Сохранено {len(all_users)} уникальных участников в {filename}")
+        return filename

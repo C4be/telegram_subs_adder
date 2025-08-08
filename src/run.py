@@ -35,12 +35,14 @@ manager.start_all()
 dialogs = manager.list_dialogs(include_channels=True)
 
 # Фильтруем по ключевым словам
-filtered_dialogs = manager.filtered_list_dialogs_by_keywords(dialogs)
+filtered_dialogs = {
+    client: manager.filtered_list_dialogs_by_keywords({client: chats})
+    for client, chats in dialogs.items()
+}
+
+# Скрапим всех в один CSV
+manager.scrape_all_chats(filtered_dialogs)
 
 # Сохраняем в JSON
 with open("data.json", "w", encoding="utf-8") as f:
     json.dump(manager.dialogs_to_json(filtered_dialogs), f, ensure_ascii=False, indent=2)
-
-# Скрап участников из первого найденного чата
-if filtered_dialogs:
-    manager.scrape_chat(manager.clients[0], filtered_dialogs[2])
