@@ -3,6 +3,7 @@ from telethon.tl.types import InputPeerEmpty
 
 from telethon_engine.client import Client
 from utils.my_logger import setup_logger
+from utils.similar_words import similarity_percentage
 
 
 class ClientManager:
@@ -59,8 +60,45 @@ class ClientManager:
 
         return result
 
-    def filered_list_dialogs(self, dialogs, keywords_dir: str = 'it.txt'):
-        pass
+    def filtered_list_dialogs_by_keywords(self, chats, keywords_dir: str = 'it.txt', threshold: int = 80):
+        # load keywords
+        with open(keywords_dir, 'r') as file:
+            keywords = file.readline().strip().split(',')
+            
+        seen_ids = set()
+        filtered = list()
+        
+        for agent in chats:
+            for chat in chats[agent]:
+
+                chat_id = chat.get('id', None)
+                # Пропускаем, если уже был
+                if  chat_id in seen_ids:
+                    continue
+                
+                
+                
+                # Проверяем ключевые слова (в названии или username)
+                title = chat.get("title") or ""
+                username = chat.get("username") or ""
+                self.logger.info(f'Смотрим чат -> \n{chat} -> [{title}, {username}]\n')
+                
+                # test = [similarity_percentage(title, kw) > threshold or similarity_percentage(username, kw) > threshold for kw in keywords]
+                # self.logger.info(f'Фильтра -> \n{test}\n')
+                
+                if any([kw in title or kw in username or
+                        similarity_percentage(title, kw) > threshold or 
+                        similarity_percentage(username, kw) > threshold 
+                        for kw in keywords]):
+                    filtered.append(chat)
+                    seen_ids.add(chat.get("id"))
+                    self.logger.info(f'Добавлен чат -> \n{chat}\n')
+            
+        return filtered
+            
+            
+            
+        
     
     def list_dialogs_json(self, include_channels=True):
         dialogs_dict = self.list_dialogs(include_channels)

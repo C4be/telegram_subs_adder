@@ -30,9 +30,19 @@ manager.add_client(beer_bot)
 
 manager.start_all()
 
-# сохранение списка диалогов
+# Получить список всех диалогов
 dialogs = manager.list_dialogs_json()
 print(dialogs)
+
+print()
+
+# Получение отфильтрованных диалогов
+filtered_dialogs = manager.filtered_list_dialogs_by_keywords(dialogs)
+print(filtered_dialogs)
+
+print()
+
+# сохранение списка диалогов
 with open('data.json', 'w', encoding='utf-8') as file:
     json.dump(dialogs, file, ensure_ascii=False, indent=4)
 
