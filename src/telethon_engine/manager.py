@@ -58,6 +58,9 @@ class ClientManager:
             )
 
         return result
+
+    def filered_list_dialogs(self, dialogs, keywords_dir: str = 'it.txt'):
+        pass
     
     def list_dialogs_json(self, include_channels=True):
         dialogs_dict = self.list_dialogs(include_channels)
@@ -67,10 +70,14 @@ class ClientManager:
             client_name = str(client)
             json_ready[client_name] = []
             for chat in chats:
-                json_ready[client_name].append({
-                    "id": chat.id,
-                    "title": getattr(chat, "title", None),
-                    "username": getattr(chat, "username", None),
-                    "type": chat.__class__.__name__
-                })
+                json_ready[client_name].append(
+                    {
+                        "id": chat.id,
+                        "title": getattr(chat, "title", None),
+                        "username": getattr(chat, "username", None),
+                        "type": chat.__class__.__name__,
+                    }
+                )
         return json_ready
+    
+    

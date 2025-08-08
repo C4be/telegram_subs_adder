@@ -1,1 +1,5 @@
 telethon
+pymorphy2
+spacy
+langdetect
+rapidfuzz
